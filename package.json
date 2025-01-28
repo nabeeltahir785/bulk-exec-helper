@@ -1,0 +1,17 @@
+{
+  "name": "bulk-exec-helper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --import tsx --test *.test.ts",
+    "test:w": "node --import tsx --test --watch *.test.ts"
+  },
+  "keywords": [],
+  "author": "George Rempousis",
+  "license": "MIT",
+  "description": "A helper class for batching jobs in parallel and either return the results as a promise or stream them",
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "tsx": "^4.19.2"
+  }
+}
