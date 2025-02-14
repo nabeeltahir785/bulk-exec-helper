@@ -29,42 +29,55 @@ export class BulkExecHelper<T> {
     this.resultStream.destroy();
     const promises = Array.from({ length: parallelExecs }, () => this.processNextIndex());
 
-    return Promise.all(promises)
-        .then(() => this.execResult)
-        .catch((err) => {
-          throw err;
-        });
+    try {
+      await Promise.all(promises);
+      return this.execResult;
+    } catch (err) {
+      throw err;
+    }
   }
 
   public execStream(parallelExecs: number): void {
     this.isStream = true;
     const promises = Array.from({ length: parallelExecs }, () => this.processNextIndex());
 
-    Promise.all(promises).catch((err) => {
-      this.resultStream.destroy(err);
+    Promise.allSettled(promises).then(() => {
+      if (this.resultsEmitted === this.fnArgs.length && !this.resultStream.destroyed) {
+        this.resultStream.push(null);
+      }
     });
   }
 
   private processResults(index: number, result: unknown): void {
     if (this.isStream) {
       this.resultsEmitted++;
-      this.resultStream.push(result);
-      if (this.resultsEmitted === this.fnArgs.length) {
-        this.resultStream.push(null);
+      if (result instanceof Error) {
+        this.resultStream.emit('error', result);
+      } else {
+        this.resultStream.push(result);
       }
     } else {
       this.execResult[index] = result;
     }
   }
 
-  private processNextIndex(): Promise<unknown> {
+  private async processNextIndex(): Promise<unknown> {
     const index = this.nextIndex++;
     if (index >= this.fnArgs.length) {
       return Promise.resolve(null);
     }
 
-    return this.execFn(...this.fnArgs[index])
-        .then((result) => this.processResults(index, result))
-        .then(this.processNextIndex);
+    try {
+      const result = await this.execFn(...this.fnArgs[index]);
+      this.processResults(index, result);
+    } catch (error) {
+      if (this.isStream) {
+        this.processResults(index, error);
+        return this.processNextIndex();
+      }
+      throw error;
+    }
+
+    return this.processNextIndex();
   }
 }
